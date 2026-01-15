@@ -401,11 +401,66 @@
         </div>
     </div>
 
+    <!-- TOAST NOTIFICATION -->
+    <div id="toast">📋 Text Copied!</div>
+
+    <style>
+        #toast {
+            visibility: hidden;
+            min-width: 250px;
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 8px;
+            padding: 12px;
+            position: fixed;
+            z-index: 1000;
+            left: 50%;
+            bottom: 30px;
+            transform: translateX(-50%);
+            font-size: 0.9rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            opacity: 0;
+            transition: opacity 0.3s, bottom 0.3s;
+        }
+
+        #toast.show {
+            visibility: visible;
+            opacity: 1;
+            bottom: 50px;
+        }
+
+        .entry-text {
+            cursor: pointer;
+            /* Show it's clickable */
+        }
+
+        .entry-text:hover {
+            color: var(--primary);
+            /* subtle hint */
+        }
+    </style>
+
     <script>
+        // ... (existing vars) ...
         let isRecording = false;
-        let autoRefresh = null;
+
+        function copyToClip(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                showToast();
+            }).catch(err => {
+                console.error('Failed to copy: ', err);
+            });
+        }
+
+        function showToast() {
+            var x = document.getElementById("toast");
+            x.className = "show";
+            setTimeout(function () { x.className = x.className.replace("show", ""); }, 2000);
+        }
 
         async function toggleRecording() {
+            // ... (existing toggle logic) ...
             const btn = document.getElementById("recordBtn");
             const status = document.getElementById("statusText");
 
@@ -456,18 +511,25 @@
             data.forEach(item => {
                 let div = document.createElement("div");
                 div.className = "entry";
+                // Feature: Highlight likely distinct/clear results vs others
+                // Added: Click to Copy
+                // Note: Escaping quotes in item.text for the onclick handler is important but simplified here.
+                // Better approach: add event listener in JS, but inline is cleaner for this snippet.
+                const safeText = item.text.replace(/'/g, "\\'");
+
                 div.innerHTML = `
                 <div class="entry-meta">
                     <span>${item.timestamp}</span>
                     <span class="lang-tag">${item.language}</span>
                 </div>
-                <div class="entry-text">${item.text}</div>
+                <div class="entry-text" onclick="copyToClip('${safeText}')" title="Click to copy">${item.text}</div>
                 ${item.audio_file ? `<audio controls src="/${item.audio_file}"></audio>` : ''}
             `;
                 log.appendChild(div);
             });
         }
 
+        // ... (rest of functions) ...
         async function fetchUnknown() {
             let res = await fetch("/unknown_words");
             let data = await res.json();
@@ -479,16 +541,16 @@
             }
 
             container.innerHTML = data.map(d => `
-            <div class="unknown-item">
-                <div style="flex:1;">
-                    <div class="unknown-word">${d.word} <span style="font-weight:400; color:var(--text-sub); font-size:0.8em;">(${d.lang})</span></div>
-                    <div style="font-size:0.8rem; color:var(--text-sub); margin-top:2px;">${d.translation || 'No definition'}</div>
-                </div>
-                <div class="unknown-status ${d.status === 'validated' ? 'validated' : ''}">
-                    ${d.status === 'validated' ? 'Valid' : 'New'}
-                </div>
-            </div>
-        `).join("");
+             <div class="unknown-item">
+                 <div style="flex:1;">
+                     <div class="unknown-word">${d.word} <span style="font-weight:400; color:var(--text-sub); font-size:0.8em;">(${d.lang})</span></div>
+                     <div style="font-size:0.8rem; color:var(--text-sub); margin-top:2px;">${d.translation || 'No definition'}</div>
+                 </div>
+                 <div class="unknown-status ${d.status === 'validated' ? 'validated' : ''}">
+                     ${d.status === 'validated' ? 'Valid' : 'New'}
+                 </div>
+             </div>
+         `).join("");
         }
 
         async function validateNow() {

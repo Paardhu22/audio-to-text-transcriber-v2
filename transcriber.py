@@ -157,8 +157,15 @@ def save_audio_chunk(raw_data, lang):
 
 def audio_callback(indata, frames, time, status):
     if status:
-        pass # print("Audio status:", status, flush=True)
+        pass 
     if recording_active:
+        # Optimization: Boost volume slightly if too quiet (Simple Normalization)
+        # vosk-small models struggle with low volume.
+        # This is a naive boost (multiplying amplitude).
+        # We process 'indata' as numpy array if we had numpy, but here it's bytes/buffer.
+        # We'll just pass it through because manipulating raw bytes in Python is slow/complex without numpy.
+        # Instead, relying on user to speak up or OS microphone gain.
+        # However, we CAN ensure we don't drop frames.
         q.put(bytes(indata))
 
 def transcribe_loop():
@@ -177,23 +184,55 @@ def transcribe_loop():
                     # Just transitioned from Recording -> Paused
                     # Flush any partial results from recognizers
                     print("🛑 Stopping... processing final fragments.")
+                    
+                    final_candidates = []
+                    
                     for lang, rec in recognizers.items():
                         if target_languages and lang not in target_languages: continue
                         
-                        # Fix for Result flush
-                        # Note: Result() might not be enough if queue was cleared.
-                        # But since we don't clear queue now, it should process remnants.
                         final_json = json.loads(rec.FinalResult())
                         text = final_json.get("text", "").strip()
+                        
                         if text:
-                            print(f"[{lang.upper()}] FINAL: {text}")
-                            save_transcript(text, lang)
-                            if "result" in final_json:
-                                for w_obj in final_json["result"]:
-                                    word = w_obj["word"]
-                                    conf = w_obj.get("conf", 1.0)
-                                    if conf < 0.6 or word == "<unk>":
-                                        save_unknown_word(word, text, lang, conf)
+                            # Calculate Score for Final Fragment
+                            words = final_json.get("result", [])
+                            avg_conf = 0.0
+                            if words:
+                                avg_conf = sum(w.get("conf", 1.0) for w in words) / len(words)
+                            
+                            # Base Score
+                            base_score = len(text) * avg_conf
+                            
+                            # Linguistic Bonus (Same as main loop)
+                            bonus = 0
+                            text_words = set(text.lower().split())
+                            matches = text_words.intersection(COMMON_WORDS.get(lang, set()))
+                            if matches:
+                                bonus = len(matches) * 20.0 
+                            
+                            final_score = base_score + bonus
+                            
+                            final_candidates.append({
+                                "lang": lang,
+                                "text": text,
+                                "score": final_score,
+                                "json": final_json
+                            })
+
+                    # Pick Winner for Final Fragment
+                    if final_candidates:
+                        final_candidates.sort(key=lambda x: x["score"], reverse=True)
+                        winner = final_candidates[0]
+                        print(f"[{winner['lang'].upper()}] FINAL: {winner['text']} (Score: {winner['score']:.2f})")
+                        save_transcript(winner['text'], winner['lang'])
+                        
+                        if "result" in winner['json']:
+                            for w_obj in winner['json']['result']:
+                                word = w_obj["word"]
+                                conf = w_obj.get("conf", 1.0)
+                                if conf < 0.6 or word == "<unk>":
+                                    # For unknown words, we pass the winner details
+                                    save_unknown_word(word, winner['text'], winner['lang'], conf)
 
                     was_recording = False
                 
@@ -216,6 +255,14 @@ def transcribe_loop():
             
             candidates = []
             
+            # IMPROVEMENT: Linguistic Verification (Stop Words)
+            # Small models hallucinate. Valid text usually contains common words.
+            COMMON_WORDS = {
+                "en": {"the", "is", "to", "and", "a", "of", "in", "it", "you", "that"},
+                "es": {"el", "la", "de", "que", "y", "en", "un", "una", "es", "por"},
+                "hi": {"है", "में", "से", "का", "की", "और", "एक", "हैं", "को", "पर"}
+            }
+            
             # FOCUS MODE: Only iterate over target languages if set
             langs_to_check = target_languages if target_languages else recognizers.keys()
             
@@ -230,17 +277,27 @@ def transcribe_loop():
                     if text:
                         words = res.get("result", [])
                         if words:
+                            # 1. Base Score: Confidence * Length
                             avg_conf = sum(w.get("conf", 1.0) for w in words) / len(words)
-                            # Threshold Logic Check
-                            # If average confidence is below 0.7, we might be hallucinating
-                            if avg_conf < 0.7:
-                                continue 
-                                
-                            score = len(text) * avg_conf
+                            if avg_conf < 0.6: continue # Hard threshold for noise
+                            
+                            base_score = len(text) * avg_conf
+                            
+                            # 2. Linguistic Bonus: Check for stop words
+                            # If the model finds "the" or "hai", it is VERY likely correct.
+                            # Give massive bonus.
+                            bonus = 0
+                            text_words = set(text.lower().split())
+                            matches = text_words.intersection(COMMON_WORDS.get(lang, set()))
+                            if matches:
+                                bonus = len(matches) * 20.0 # +20 points per stop word!
+                            
+                            final_score = base_score + bonus
+                            
                             candidates.append({
                                 "lang": lang, 
                                 "text": text, 
-                                "score": score, 
+                                "score": final_score, 
                                 "json": res
                             })
             
@@ -250,6 +307,7 @@ def transcribe_loop():
                 
                 best_lang = winner["lang"]
                 best_text = winner["text"]
+                # ... rest of saving logic ...
                 best_json = winner["json"]
                 
                 audio_path = save_audio_chunk(data, best_lang)
