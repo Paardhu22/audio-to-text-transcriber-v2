@@ -2,15 +2,12 @@
 
 A powerful, **offline-first** audio-to-text transcription system built with Python, Flask, and Vosk. It captures audio, detects language (English, Spanish, Hindi), and provides a modern "Glassmorphism" UI for real-time management.
 
-![Scribe Dashboard Preview](https://i.imgur.com/your-image-placeholder.png)
-
 ## 🚀 Key Features
 
 *   **🔒 Fully Offline**: No internet required for transcription. Your data stays on your device.
 *   **🌍 Multi-Language Support**: Supports English (`en`), Spanish (`es`), and Hindi (`hi`).
 *   **🎯 Focus Mode**: Select a specific language to drastically improve accuracy and reduce "hallucinations".
-*   **🧠 Incremental Learning**: Detects unknown words and allows you to "validate" them online to build a custom vocabulary.
-*   **🎨 Premium UI**: Beautiful, responsive dashboard with animated recording controls and real-time updates.
+*   **🧠 Incremental Learning**: Detects unknown words and allows you to "validate" them online to build a custom vocabulary(still under development).
 *   **📂 Export Data**: Download your transcripts as `.txt` or `.csv`.
 
 ---
