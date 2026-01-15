@@ -1,90 +1,521 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
+
 <head>
-    <title>Offline Audio Transcription</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scribe | Intelligent Offline Transcription</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
     <style>
-        body { font-family: Arial, sans-serif; background: #f9f9f9; margin: 20px; }
-        h1 { color: #333; }
-        #controls { margin-bottom: 15px; }
-        #controls a {
-            display: inline-block; margin-right: 10px; padding: 8px 12px;
-            background: #007BFF; color: white; border-radius: 5px;
-            text-decoration: none; font-size: 14px;
+        :root {
+            --primary: #6366f1;
+            /* Indigo */
+            --primary-glow: rgba(99, 102, 241, 0.4);
+            --danger: #ef4444;
+            --success: #22c55e;
+            --bg: #f8fafc;
+            --card-bg: rgba(255, 255, 255, 0.9);
+            --card-border: rgba(255, 255, 255, 0.6);
+            --text-main: #1e293b;
+            --text-sub: #64748b;
         }
-        #controls a:hover { background: #0056b3; }
-        #controls select { background: white; color: black; border: 1px solid #ccc; }
-        #log { background: #fff; padding: 15px; border-radius: 10px;
-               box-shadow: 0 2px 6px rgba(0,0,0,0.2); max-height: 500px; overflow-y: auto; }
-        .entry { margin-bottom: 10px; padding: 8px; border-bottom: 1px solid #eee; }
-        .timestamp { font-size: 0.9em; color: #888; }
-        .lang { font-weight: bold; margin-left: 5px; color: #007BFF; }
-        #pagination { margin-top: 10px; text-align: center; }
-        #pagination button {
-            margin: 0 2px; padding: 5px 10px; border-radius: 5px; border: 1px solid #007BFF; background: #fff;
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
+            color: var(--text-main);
+            margin: 0;
+            padding: 40px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        /* HEADER */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+
+        h1 {
+            font-weight: 800;
+            font-size: 2.5rem;
+            margin: 0;
+            background: linear-gradient(to right, #4f46e5, #818cf8);
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.02em;
+        }
+
+        /* RECORDING BUTTON */
+        .record-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 40px;
+        }
+
+        #recordBtn {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: none;
+            background: white;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
             cursor: pointer;
+            position: relative;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            /* Mic icon size */
+            color: var(--text-main);
         }
-        #pagination button.active { background: #007BFF; color: #fff; }
+
+        #recordBtn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+        }
+
+        #recordBtn.recording {
+            background: var(--danger);
+            color: white;
+            animation: pulse-red 2s infinite;
+        }
+
+        #recordBtn.recording::after {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 2px solid var(--danger);
+            animation: ripple 1.5s infinite linear;
+        }
+
+        @keyframes pulse-red {
+            0% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+            }
+
+            70% {
+                box-shadow: 0 0 0 15px rgba(239, 68, 68, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+            }
+        }
+
+        @keyframes ripple {
+            0% {
+                transform: scale(1);
+                opacity: 0.6;
+            }
+
+            100% {
+                transform: scale(1.5);
+                opacity: 0;
+            }
+        }
+
+        .status-text {
+            margin-top: 15px;
+            font-weight: 600;
+            color: var(--text-sub);
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+        }
+
+        /* DASHBOARD GRID */
+        .dashboard {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 30px;
+        }
+
+        /* GLASS CARD */
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.05);
+            height: fit-content;
+        }
+
+        .card h2 {
+            margin-top: 0;
+            font-size: 1.25rem;
+            color: var(--text-main);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* CONTROLS */
+        .controls-row {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .btn-small {
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            background: white;
+            color: var(--text-main);
+            font-size: 0.9rem;
+            text-decoration: none;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-small:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+            background: #f8fafc;
+        }
+
+        select {
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            background: white;
+            font-family: inherit;
+        }
+
+        /* LOG ENTRIES */
+        #log {
+            max-height: 500px;
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+
+        .entry {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            border: 1px solid #f1f5f9;
+            transition: transform 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .entry:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+            border-color: #e2e8f0;
+        }
+
+        .entry::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: var(--primary);
+        }
+
+        .entry-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            color: var(--text-sub);
+            margin-bottom: 8px;
+        }
+
+        .lang-tag {
+            background: #e0e7ff;
+            color: var(--primary);
+            padding: 2px 8px;
+            border-radius: 99px;
+            font-weight: 700;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+        }
+
+        .entry-text {
+            font-size: 1.05rem;
+            line-height: 1.5;
+            color: var(--text-main);
+        }
+
+        audio {
+            width: 100%;
+            height: 32px;
+            margin-top: 10px;
+            opacity: 0.8;
+            border-radius: 8px;
+        }
+
+        /* UNKNOWN WORDS SECTION */
+        .unknown-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .unknown-word {
+            font-weight: 700;
+            color: var(--danger);
+        }
+
+        .unknown-status {
+            font-size: 0.8rem;
+            padding: 4px 10px;
+            border-radius: 6px;
+            background: #fee2e2;
+            color: var(--danger);
+        }
+
+        .unknown-status.validated {
+            background: #dcfce7;
+            color: var(--success);
+        }
+
+        .validate-btn {
+            width: 100%;
+            padding: 12px;
+            background: var(--success);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .validate-btn:hover {
+            background: #16a34a;
+        }
+
+        /* SCROLLBAR */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
     </style>
 </head>
+
 <body>
-    <h1>🎤 Offline Transcription Dashboard</h1>
-    <div id="controls">
-        <a href="/download/txt">⬇ Download TXT</a>
-        <a href="/download/csv">⬇ Download CSV</a>
-        <label>Filter:
-            <select id="langFilter" onchange="fetchData(1)">
-                <option value="all">All</option>
-                <option value="en">English</option>
-                <option value="es">Spanish</option>
-                <option value="hi">Hindi</option>
-            </select>
-        </label>
+
+    <div class="container">
+        <header>
+            <h1>Scribe</h1>
+            <div style="font-size: 0.9rem; color: var(--text-sub);">
+                Offline AI Transcription
+            </div>
+        </header>
+
+        <div class="record-wrapper">
+            <button id="recordBtn" onclick="toggleRecording()">
+                🎤
+            </button>
+            <div class="status-text" id="statusText">System Ready</div>
+
+            <div style="margin-top: 15px; display: flex; align-items: center; gap: 10px;">
+                <label for="focusLang" style="font-size: 0.9rem; color: var(--text-sub); font-weight: 600;">🎯 Focus
+                    Mode:</label>
+                <select id="focusLang" style="padding: 5px 10px; border-radius: 6px; border: 1px solid #ccc;">
+                    <option value="auto">✨ Auto (Detect All)</option>
+                    <option value="en">English (EN)</option>
+                    <option value="es">Spanish (ES)</option>
+                    <option value="hi">Hindi (HI)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="dashboard">
+            <!-- Main Transcripts -->
+            <div class="card">
+                <h2>📜 Recent Transcripts</h2>
+
+                <div
+                    style="background: #e0e7ff; padding: 12px; border-radius: 8px; margin-bottom: 20px; font-size: 0.9rem; color: #3730a3; border: 1px solid #c7d2fe;">
+                    <strong>💡 Quick Start:</strong>
+                    <ul style="margin: 5px 0; padding-left: 20px;">
+                        <li>Click the <strong>Microphone Button</strong> to start recording.</li>
+                        <li>Speak clearly (EN, ES, or HI).</li>
+                        <li>Click <strong>Microphone</strong> again to Stop & Process. results will appear below.</li>
+                    </ul>
+                </div>
+
+                <div class="controls-row">
+                    <a href="/download/txt" class="btn-small">📄 TXT</a>
+                    <a href="/download/csv" class="btn-small">📊 CSV</a>
+                    <select id="langFilter" onchange="fetchData(1)" style="margin-left: auto;">
+                        <option value="all">All Languages</option>
+                        <option value="en">English (EN)</option>
+                        <option value="es">Spanish (ES)</option>
+                        <option value="hi">Hindi (HI)</option>
+                    </select>
+                </div>
+                <div id="log"></div>
+            </div>
+
+            <!-- Sidebar: Unknown Words -->
+            <div class="card">
+                <h2>🧠 Learning Center</h2>
+                <button class="validate-btn" onclick="validateNow()">
+                    Run Online Validation
+                </button>
+                <div id="validate-status"
+                    style="font-size: 0.85rem; color: var(--text-sub); margin-bottom: 15px; text-align: center;"></div>
+
+                <div id="unknown-log">
+                    <p style="color: var(--text-sub); font-size: 0.9rem;">No unknown words yet.</p>
+                </div>
+            </div>
+        </div>
     </div>
-    <div id="log"></div>
-    <div id="pagination"></div>
 
     <script>
-        let lastTimestamp = null;
-        let currentPage = 1;
-        const pageSize = 20;
+        let isRecording = false;
+        let autoRefresh = null;
 
-        async function fetchData(page) {
-            currentPage = page || currentPage;
+        async function toggleRecording() {
+            const btn = document.getElementById("recordBtn");
+            const status = document.getElementById("statusText");
+
+            if (!isRecording) {
+                // Start
+                const lang = document.getElementById("focusLang").value;
+                try {
+                    let res = await fetch("/record/start", {
+                        method: "POST",
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ lang: lang })
+                    });
+                    let data = await res.json();
+                    if (data.status === "recording_started") {
+                        isRecording = true;
+                        btn.classList.add("recording");
+                        status.innerText = `Recording (${lang.toUpperCase()})...`;
+                        status.style.color = "var(--danger)";
+                    }
+                } catch (e) { console.error(e); }
+            } else {
+                // Stop
+                try {
+                    let res = await fetch("/record/stop", { method: "POST" });
+                    let data = await res.json();
+                    if (data.status === "recording_stopped") {
+                        isRecording = false;
+                        btn.classList.remove("recording");
+                        status.innerText = "Processing Paused";
+                        status.style.color = "var(--text-sub)";
+                    }
+                } catch (e) { console.error(e); }
+            }
+        }
+
+        async function fetchData() {
             let lang = document.getElementById("langFilter").value;
-            let res = await fetch(`/data?lang=${lang}&limit=${pageSize}`);
+            let res = await fetch(`/data?lang=${lang}&limit=50`);
             let data = await res.json();
 
             let log = document.getElementById("log");
+
+            // Only update if content changed (simple check) avoids refreshing audio players while playing
+            // For smoother UX, we'd use a virtual DOM, but here we'll just rebuild for simplicity 
+            // We will simple clearing for now.
             log.innerHTML = "";
-            data.reverse().forEach(item => {
+
+            data.forEach(item => {
                 let div = document.createElement("div");
                 div.className = "entry";
-                div.innerHTML = `<div class="timestamp">${item.timestamp} <span class="lang">[${item.language}]</span></div>
-                                 <div class="text">${item.text}</div>
-                                 ${item.audio_file ? `<audio controls src="/${item.audio_file}" style="margin-top:5px; width:300px;"></audio>` : ''}`;
+                div.innerHTML = `
+                <div class="entry-meta">
+                    <span>${item.timestamp}</span>
+                    <span class="lang-tag">${item.language}</span>
+                </div>
+                <div class="entry-text">${item.text}</div>
+                ${item.audio_file ? `<audio controls src="/${item.audio_file}"></audio>` : ''}
+            `;
                 log.appendChild(div);
             });
-
-            // Auto scroll to newest entry
-            log.scrollTop = log.scrollHeight;
-
-            renderPagination();
         }
 
-        function renderPagination() {
-            const pagination = document.getElementById("pagination");
-            pagination.innerHTML = "";
-            for (let i = 1; i <= 5; i++) { // simple fixed 5-page example
-                const btn = document.createElement("button");
-                btn.innerText = i;
-                if (i === currentPage) btn.classList.add("active");
-                btn.onclick = () => fetchData(i);
-                pagination.appendChild(btn);
+        async function fetchUnknown() {
+            let res = await fetch("/unknown_words");
+            let data = await res.json();
+            let container = document.getElementById("unknown-log");
+
+            if (data.length === 0) {
+                container.innerHTML = "<p style='color: var(--text-sub); font-size: 0.9rem;'>No unknown words yet.</p>";
+                return;
+            }
+
+            container.innerHTML = data.map(d => `
+            <div class="unknown-item">
+                <div style="flex:1;">
+                    <div class="unknown-word">${d.word} <span style="font-weight:400; color:var(--text-sub); font-size:0.8em;">(${d.lang})</span></div>
+                    <div style="font-size:0.8rem; color:var(--text-sub); margin-top:2px;">${d.translation || 'No definition'}</div>
+                </div>
+                <div class="unknown-status ${d.status === 'validated' ? 'validated' : ''}">
+                    ${d.status === 'validated' ? 'Valid' : 'New'}
+                </div>
+            </div>
+        `).join("");
+        }
+
+        async function validateNow() {
+            let status = document.getElementById("validate-status");
+            status.innerText = "⏳ Connecting...";
+            try {
+                let res = await fetch("/validate_now");
+                let json = await res.json();
+                if (json.status === "success") {
+                    status.innerText = `✅ Validated ${json.validated_count} words.`;
+                    status.style.color = "var(--success)";
+                    fetchUnknown();
+                } else {
+                    status.innerText = "❌ Error: " + json.message;
+                    status.style.color = "var(--danger)";
+                }
+            } catch (e) {
+                status.innerText = "❌ Network Error";
             }
         }
 
         setInterval(fetchData, 2000);
-        fetchData(1);
+        setInterval(fetchUnknown, 5000);
+        fetchData();
+        fetchUnknown();
     </script>
+
 </body>
+
 </html>

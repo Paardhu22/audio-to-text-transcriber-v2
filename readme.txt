@@ -1,2 +1,0 @@
-3 every audio is checked for english , and then for spanish and then for hindi , if text found , then save in database with all three languages , if the audio is not from that language then dont save to the database with that language
-4 You want each recognized transcript also tied to its audio snippet so you can review the original recording.

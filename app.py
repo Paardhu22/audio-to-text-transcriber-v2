@@ -37,6 +37,47 @@ def data():
     lang = request.args.get("lang", "all")
     return jsonify(get_transcripts(limit=20, lang=lang))
 
+@app.route("/record/start", methods=["POST"])
+def start_recording_route():
+    # Helper to get the lang from the request
+    # Expect JSON: { "lang": "en" } or { "lang": "auto" }
+    data = request.json or {}
+    lang = data.get("lang", "auto")
+    
+    transcriber.set_target_language(lang)
+    transcriber.set_recording_state(True)
+    return jsonify({"status": "recording_started", "focus_mode": lang})
+
+@app.route("/record/stop", methods=["POST"])
+def stop_recording_route():
+    transcriber.set_recording_state(False)
+    return jsonify({"status": "recording_stopped"})
+
+@app.route("/unknown_words")
+def unknown_words():
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM unknown_words ORDER BY id DESC")
+    rows = cursor.fetchall()
+    # id, word, context, detected_lang, confidence, status, translation, timestamp
+    data = [
+        {
+            "id": r[0], "word": r[1], "context": r[2], "lang": r[3],
+            "conf": r[4], "status": r[5], "translation": r[6], "timestamp": r[7]
+        }
+        for r in rows
+    ]
+    return jsonify(data)
+
+@app.route("/validate_now")
+def validate_now():
+    try:
+        import validator
+        count = validator.validate_pending_words()
+        return jsonify({"status": "success", "validated_count": count})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
+
 # 🔹 Download TXT
 @app.route("/download/txt")
 def download_txt():

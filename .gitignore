@@ -1,0 +1,22 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+*.db
+*.sqlite3
+transcriptions.db
+
+# User Media
+audio_clips/
+*.wav
+
+# Large Models (User must download these)
+vosk-model-*/
+
+# OS specific
+.DS_Store
+Thumbs.db
