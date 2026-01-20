@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Translator | Scribe</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --success: #22c55e;
+            --bg: #f8fafc;
+            --card-bg: rgba(255, 255, 255, 0.95);
+            --text-main: #1e293b;
+            --text-sub: #64748b;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
+            color: var(--text-main);
+            margin: 0;
+            padding: 40px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+
+        h1 {
+            font-weight: 800;
+            margin: 0;
+            color: var(--text-main);
+        }
+
+        .home-btn {
+            text-decoration: none;
+            color: var(--primary);
+            font-weight: 600;
+            border: 1px solid var(--primary);
+            padding: 8px 16px;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .home-btn:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* TRANSLATOR UI */
+        .translator-box {
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            min-height: 400px;
+        }
+
+        .pane {
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .source-pane {
+            border-right: 1px solid #e2e8f0;
+            background: #f8fafc;
+        }
+
+        .target-pane {
+            background: white;
+        }
+
+        .pane-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        select,
+        .lang-badge {
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid #cbd5e1;
+            font-family: inherit;
+            background: white;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        textarea {
+            flex: 1;
+            width: 100%;
+            border: none;
+            background: transparent;
+            font-family: 'Inter', sans-serif;
+            font-size: 1.2rem;
+            color: var(--text-main);
+            resize: none;
+            outline: none;
+            line-height: 1.6;
+        }
+
+        textarea::placeholder {
+            color: var(--text-sub);
+            opacity: 0.6;
+        }
+
+        .translate-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 1rem;
+            width: 100%;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: all 0.2s;
+        }
+
+        .translate-btn:hover {
+            background: #4f46e5;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(99, 102, 241, 0.3);
+        }
+
+        #detected-label {
+            font-size: 0.85rem;
+            color: var(--text-sub);
+            font-weight: 600;
+        }
+
+        @media (max-width: 768px) {
+            .translator-box {
+                grid-template-columns: 1fr;
+            }
+
+            .source-pane {
+                border-right: none;
+                border-bottom: 1px solid #e2e8f0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <header>
+            <h1>AI Translator</h1>
+            <a href="/" class="home-btn">← Home</a>
+        </header>
+
+        <div class="translator-box">
+            <!-- Source -->
+            <div class="pane source-pane">
+                <div class="pane-header">
+                    <span id="detected-label">Detect Language (Auto)</span>
+                    <button class="home-btn"
+                        style="border:none; background:transparent; padding:0; font-size:1.2rem; cursor:pointer;"
+                        onclick="clearText()">✖</button>
+                </div>
+                <textarea id="source-text" placeholder="Type text here to translate..."></textarea>
+                <div style="font-size:0.8rem; color: #94a3b8; margin-top:10px;">Offline Mode • Dictionary Based</div>
+            </div>
+
+            <!-- Target -->
+            <div class="pane target-pane">
+                <div class="pane-header">
+                    <select id="target-lang">
+                        <option value="es">Spanish (Español)</option>
+                        <option value="hi">Hindi (हिन्दी)</option>
+                        <option value="en">English</option>
+                    </select>
+                    <button class="home-btn"
+                        style="border:none; background:transparent; padding:0; font-size:1.2rem; cursor:pointer;"
+                        onclick="copyText()">📋</button>
+                </div>
+                <textarea id="target-text" readonly placeholder="Translation will appear here..."></textarea>
+            </div>
+        </div>
+
+        <button class="translate-btn" onclick="doTranslate()">✨ Translate Now</button>
+    </div>
+
+    <script>
+        async function doTranslate() {
+            const source = document.getElementById("source-text").value;
+            const target = document.getElementById("target-lang").value;
+            const targetBox = document.getElementById("target-text");
+            const detectLabel = document.getElementById("detected-label");
+
+            if (!source.trim()) return;
+
+            targetBox.style.opacity = "0.5";
+
+            try {
+                let res = await fetch("/api/translate", {
+                    method: "POST",
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: source, target_lang: target })
+                });
+                let data = await res.json();
+
+                targetBox.value = data.translated_text;
+                targetBox.style.opacity = "1";
+
+                // Update detected lang
+                let langName = data.detected_lang.toUpperCase();
+                detectLabel.innerText = `Detailed Language: ${langName}`;
+                detectLabel.style.color = "var(--primary)";
+
+            } catch (e) {
+                console.error(e);
+                targetBox.value = "Error: Could not translate.";
+            }
+        }
+
+        function clearText() {
+            document.getElementById("source-text").value = "";
+            document.getElementById("target-text").value = "";
+            document.getElementById("detected-label").innerText = "Detect Language (Auto)";
+            document.getElementById("detected-label").style.color = "var(--text-sub)";
+        }
+
+        function copyText() {
+            const text = document.getElementById("target-text").value;
+            if (text) navigator.clipboard.writeText(text);
+        }
+    </script>
+</body>
+
+</html>
